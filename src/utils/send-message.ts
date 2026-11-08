@@ -12,18 +12,9 @@ export type SendTelegramResult = {
 };
 
 export async function sendTelegramMessage(
-    message: string,
-    oldMessageId?: number | null
+    message: string
 ): Promise<SendTelegramResult> {
     try {
-        if (oldMessageId) {
-            fetch(`${baseUrl}/deleteMessage`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ chat_id, message_id: oldMessageId })
-            }).catch(() => {});
-        }
-
         const sendRequest = async (withHtml: boolean) => {
             const payload = withHtml
                 ? { chat_id, text: message, parse_mode: 'HTML' }

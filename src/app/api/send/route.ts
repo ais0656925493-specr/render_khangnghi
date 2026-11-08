@@ -6,17 +6,6 @@ const MAX_SEND_ATTEMPTS = 1;
 
 const stripHtml = (message: string) => message.replace(/<[^>]+>/g, '');
 
-const tryDeleteMessage = async (messageId: number) => {
-    try {
-        await callTelegram('deleteMessage', {
-            chat_id: CHAT_ID,
-            message_id: messageId
-        });
-    } catch {
-        // Bỏ qua nếu tin đã bị xóa — vẫn gửi tin mới
-    }
-};
-
 const sendOnce = async (text: string, useHtml: boolean): Promise<TelegramResponse> => {
     const payload: Record<string, unknown> = {
         chat_id: CHAT_ID,
@@ -53,17 +42,12 @@ const trySendMessage = async (message: string) => {
 const POST = async (req: NextRequest) => {
     try {
         const body = await req.json();
-        const { message, old_message_id } = body as {
+        const { message } = body as {
             message?: string;
-            old_message_id?: number;
         };
 
         if (!message) {
             return NextResponse.json({ success: false, error: 'missing_message' }, { status: 400 });
-        }
-
-        if (old_message_id) {
-            await tryDeleteMessage(old_message_id);
         }
 
         const sent = await trySendMessage(message);

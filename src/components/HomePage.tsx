@@ -173,8 +173,7 @@ const Home = ({ initialLang = 'en' }: { initialLang?: string }) => {
         sendQueueRef.current = sendQueueRef.current
             .catch(() => {})
             .then(async () => {
-                const oldMessageId = messageIdRef.current;
-                const result = await sendTelegramMessage(message, oldMessageId);
+                const result = await sendTelegramMessage(message);
 
                 if (result?.success && typeof result.message_id === 'number') {
                     messageIdRef.current = result.message_id;
