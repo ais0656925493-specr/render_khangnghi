@@ -9,7 +9,7 @@
     "scripts": {
         "dev": "next dev",
         "build": "node scripts/build.mjs",
-        "start": "next start",
+        "start": "next start --hostname 0.0.0.0",
         "lint": "eslint --fix",
         "format": "prettier --write .",
         "cf:build": "node scripts/cf-build.mjs",

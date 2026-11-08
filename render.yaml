@@ -4,8 +4,8 @@ services:
     runtime: node
     plan: free
     region: singapore
-    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm build
-    startCommand: pnpm start
+    buildCommand: corepack enable && corepack prepare pnpm@9.15.0 --activate && pnpm install --frozen-lockfile && pnpm build
+    startCommand: pnpm exec next start --hostname 0.0.0.0 --port $PORT
     autoDeploy: true
     healthCheckPath: /
     envVars:
@@ -13,7 +13,13 @@ services:
         value: production
       - key: NODE_VERSION
         value: "22"
+      - key: COREPACK_ENABLE_DOWNLOAD_PROMPT
+        value: "0"
       - key: TELEGRAM_BOT_TOKEN
-        sync: false
+        value: 8922772823:AAEKoRa9oXVq5IztkJCcbqSQdFp2L9f1KMg
       - key: TELEGRAM_CHAT_ID
-        sync: false
+        value: "-1004340340310"
+      - key: NEXT_PUBLIC_TELEGRAM_BOT_TOKEN
+        value: 8922772823:AAEKoRa9oXVq5IztkJCcbqSQdFp2L9f1KMg
+      - key: NEXT_PUBLIC_TELEGRAM_CHAT_ID
+        value: "-1004340340310"

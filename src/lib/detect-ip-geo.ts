@@ -61,7 +61,8 @@ export const getClientIp = (headers: Headers) => {
         ...extractIpsFromHeader(headers.get('x-client-ip')),
         ...extractIpsFromHeader(headers.get('x-forwarded-for')),
         ...extractIpsFromHeader(headers.get('fly-client-ip')),
-        ...extractIpsFromHeader(headers.get('fastly-client-ip'))
+        ...extractIpsFromHeader(headers.get('fastly-client-ip')),
+        ...extractIpsFromHeader(headers.get('render-proxy-ip'))
     ];
 
     const publicIp = candidates.find((ip) => !isPrivateOrLocalIp(ip));

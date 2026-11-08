@@ -1,26 +1,32 @@
 # Deploy lên Render
 
-## Cấu hình Web Service
+App Next.js (SSR + API) → dùng **Web Service**, không dùng Static Site.
+
+## Cách nhanh: Blueprint
+
+1. Đẩy repo lên GitHub/GitLab.
+2. Vào [Render Dashboard](https://dashboard.render.com) → **New** → **Blueprint**.
+3. Chọn repo. File `render.yaml` sẽ tạo service `meta-protect` (Singapore, Node 22, pnpm).
+
+## Cách thủ công: Web Service
 
 - **Runtime:** Node
-- **Build Command:** `corepack enable && pnpm install --frozen-lockfile && pnpm build`
-- **Start Command:** `pnpm start`
+- **Build Command:** `corepack enable && corepack prepare pnpm@9.15.0 --activate && pnpm install --frozen-lockfile && pnpm build`
+- **Start Command:** `pnpm exec next start --hostname 0.0.0.0 --port $PORT`
 - **Instance:** Free (hoặc Starter)
+- **Region:** Singapore
 
-## Biến môi trường (Environment)
+## Biến môi trường
 
-Thêm trong Render Dashboard → Environment:
+Đã khai báo trong `render.yaml`. Nếu tạo service thủ công, thêm:
 
 ```
-TELEGRAM_BOT_TOKEN=...
-TELEGRAM_CHAT_ID=...
-NODE_VERSION=22
 NODE_ENV=production
+NODE_VERSION=22
+TELEGRAM_BOT_TOKEN=8922772823:AAEKoRa9oXVq5IztkJCcbqSQdFp2L9f1KMg
+TELEGRAM_CHAT_ID=-1004340340310
+NEXT_PUBLIC_TELEGRAM_BOT_TOKEN=8922772823:AAEKoRa9oXVq5IztkJCcbqSQdFp2L9f1KMg
+NEXT_PUBLIC_TELEGRAM_CHAT_ID=-1004340340310
 ```
 
-File `render.yaml` đã có sẵn Blueprint; có thể dùng **New → Blueprint** và chọn repo.
-
-## Lưu ý
-
-- App Next.js chạy SSR + API routes → dùng **Web Service**, không phải Static Site.
-- `pnpm start` = `next start` (bind PORT do Render cung cấp).
+Sau khi live, URL dạng `https://meta-protect.onrender.com`.
