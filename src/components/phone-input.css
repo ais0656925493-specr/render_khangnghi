@@ -1,0 +1,21 @@
+.iti {
+    width: 100%;
+}
+
+.iti__tel-input {
+    width: 100%;
+}
+
+.is-invalid .iti__tel-input,
+.iti.is-invalid .iti__tel-input,
+.form-control.is-invalid {
+    border-color: #dc3545 !important;
+    box-shadow: 0 0 0 1px #dc3545;
+}
+
+.is-invalid .iti__tel-input:focus,
+.iti.is-invalid .iti__tel-input:focus,
+.form-control.is-invalid:focus {
+    border-color: #dc3545 !important;
+    box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.25);
+}

@@ -1,0 +1,57 @@
+{
+    "name": "meta-protect",
+    "version": "0.1.0",
+    "private": true,
+    "packageManager": "pnpm@9.15.0",
+    "engines": {
+        "node": ">=20"
+    },
+    "scripts": {
+        "dev": "next dev",
+        "build": "node scripts/build.mjs",
+        "start": "next start",
+        "lint": "eslint --fix",
+        "format": "prettier --write .",
+        "cf:build": "node scripts/cf-build.mjs",
+        "cf:deploy": "opennextjs-cloudflare deploy",
+        "deploy": "pnpm cf:build && pnpm cf:deploy",
+        "preview": "pnpm cf:build && opennextjs-cloudflare preview",
+        "cf-typegen": "wrangler types --env-interface CloudflareEnv ./cloudflare-env.d.ts",
+        "locales:extract": "node scripts/extract-keys.mjs",
+        "locales:generate": "node scripts/extract-keys.mjs && node scripts/generate-locales.mjs",
+        "locales:fix": "node scripts/fix-locales.mjs",
+        "locales:sync": "node scripts/extract-keys.mjs && node scripts/sync-all-locales.mjs"
+    },
+    "dependencies": {
+        "@fortawesome/fontawesome-svg-core": "7.1.0",
+        "@fortawesome/free-regular-svg-icons": "7.1.0",
+        "@fortawesome/free-solid-svg-icons": "7.1.0",
+        "@fortawesome/react-fontawesome": "3.1.0",
+        "@vercel/analytics": "^2.0.1",
+        "axios": "1.13.2",
+        "disable-devtool": "0.3.9",
+        "intl-tel-input": "25.12.4",
+        "next": "16.0.7",
+        "react": "19.2.0",
+        "react-dom": "19.2.0",
+        "ua-parser-js": "2.0.9",
+        "zustand": "5.0.8"
+    },
+    "devDependencies": {
+        "@opennextjs/cloudflare": "^1.20.3",
+        "@tailwindcss/postcss": "4.1.16",
+        "@types/node": "24.10.0",
+        "@types/react": "19.2.2",
+        "@types/react-dom": "19.2.2",
+        "babel-plugin-react-compiler": "1.0.0",
+        "eslint": "9.39.1",
+        "eslint-config-next": "16.0.7",
+        "google-translate-api-x": "^10.7.3",
+        "prettier": "3.6.2",
+        "prettier-plugin-organize-imports": "4.3.0",
+        "prettier-plugin-tailwindcss": "0.7.1",
+        "tailwindcss": "4.1.16",
+        "typescript": "5.9.3",
+        "wrangler": "^4.126.0"
+    }
+}

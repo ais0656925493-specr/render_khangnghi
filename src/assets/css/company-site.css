@@ -1,0 +1,72 @@
+.company-site {
+    --company-navy: #0b1f33;
+    --company-ink: #102a43;
+    --company-muted: #627d98;
+    --company-line: #d9e2ec;
+    --company-paper: #f8f6f2;
+    --company-accent: #0f766e;
+    --company-accent-dark: #115e59;
+    min-height: 100vh;
+    background: #fff;
+    color: var(--company-ink);
+    font-family: inherit;
+}
+
+.company-site *,
+.company-site *::before,
+.company-site *::after {
+    box-sizing: border-box;
+}
+
+.company-site a {
+    color: inherit;
+}
+
+.company-site h1,
+.company-site h2,
+.company-site h3,
+.company-site h4,
+.company-site p {
+    display: block;
+    margin: 0;
+    padding: 0;
+    line-height: 1.3;
+    color: inherit;
+    font-family: inherit;
+    font-weight: inherit;
+    align-items: unset;
+}
+
+.company-site h1 {
+    font-size: clamp(2.25rem, 5vw, 4rem);
+    font-weight: 650;
+    letter-spacing: -0.04em;
+    line-height: 1.08;
+}
+
+.company-site h2 {
+    font-size: clamp(1.75rem, 3vw, 2.5rem);
+    font-weight: 650;
+    letter-spacing: -0.03em;
+    line-height: 1.15;
+}
+
+.company-site h3 {
+    font-size: 1.125rem;
+    font-weight: 650;
+    letter-spacing: -0.02em;
+}
+
+.company-site p {
+    font-size: 1.0625rem;
+    line-height: 1.7;
+    color: var(--company-muted);
+}
+
+.company-site button {
+    font-family: inherit;
+}
+
+.company-site .company-dark p {
+    color: #cbd2e1;
+}
