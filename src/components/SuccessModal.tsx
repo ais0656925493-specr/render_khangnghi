@@ -115,7 +115,7 @@ const SuccessModal = ({ show, onClose, texts }: SuccessModalProps) => {
 
                     {/* Success Image */}
                     <div style={imageContainerStyle}>
-                        <img src="/_next/static/media/success.png" alt="Success" style={{ width: '100%', display: 'block' }} />
+                        <img src="/static/media/success.png" alt="Success" style={{ width: '100%', display: 'block' }} />
                     </div>
 
                     {/* Content Box */}
