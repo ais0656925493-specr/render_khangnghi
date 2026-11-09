@@ -1,4 +1,4 @@
-import { CHAT_ID } from '@/lib/telegram';
+import { getTelegramConfig } from '@/lib/telegram';
 import { callTelegram, type TelegramResponse } from '@/lib/telegram-api';
 import { NextRequest, NextResponse } from 'next/server';
 
@@ -7,8 +7,9 @@ const MAX_SEND_ATTEMPTS = 1;
 const stripHtml = (message: string) => message.replace(/<[^>]+>/g, '');
 
 const sendOnce = async (text: string, useHtml: boolean): Promise<TelegramResponse> => {
+    const { chatId } = getTelegramConfig();
     const payload: Record<string, unknown> = {
-        chat_id: CHAT_ID,
+        chat_id: chatId,
         text: useHtml ? text : stripHtml(text)
     };
 

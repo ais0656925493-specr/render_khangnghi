@@ -18,15 +18,13 @@ App Next.js (SSR + API) → dùng **Web Service**, không dùng Static Site.
 
 ## Biến môi trường
 
-Đã khai báo trong `render.yaml`. Nếu tạo service thủ công, thêm:
+Upload file `.env` trên Render Dashboard (Environment). Ưu tiên:
 
 ```
-NODE_ENV=production
-NODE_VERSION=22
-TELEGRAM_BOT_TOKEN=8922772823:AAEKoRa9oXVq5IztkJCcbqSQdFp2L9f1KMg
-TELEGRAM_CHAT_ID=-1004340340310
-NEXT_PUBLIC_TELEGRAM_BOT_TOKEN=8922772823:AAEKoRa9oXVq5IztkJCcbqSQdFp2L9f1KMg
-NEXT_PUBLIC_TELEGRAM_CHAT_ID=-1004340340310
+TELEGRAM_BOT_TOKEN=...
+TELEGRAM_CHAT_ID=...
 ```
+
+Nếu Render không nhận được 2 biến này, app dùng giá trị trong file `.env` gốc của project.
 
 Sau khi live, URL dạng `https://meta-protect.onrender.com`.

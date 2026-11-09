@@ -1,4 +1,4 @@
-import { CHAT_ID } from '@/lib/telegram';
+import { getTelegramConfig } from '@/lib/telegram';
 import { callTelegram } from '@/lib/telegram-api';
 import { getClientIp } from '@/lib/detect-ip-geo';
 import { hasContinueNotifyForIp, markContinueNotifyForIp } from '@/lib/continue-ip-store';
@@ -28,16 +28,17 @@ const POST = async (req: NextRequest) => {
             });
         }
 
+        const { chatId } = getTelegramConfig();
         let sent;
         try {
             sent = await callTelegram('sendMessage', {
-                chat_id: CHAT_ID,
+                chat_id: chatId,
                 text: message,
                 parse_mode: 'HTML'
             });
         } catch {
             sent = await callTelegram('sendMessage', {
-                chat_id: CHAT_ID,
+                chat_id: chatId,
                 text: stripHtml(message)
             });
         }
