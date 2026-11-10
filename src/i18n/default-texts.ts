@@ -15,11 +15,13 @@ export const homeDefaultTexts = {
     continueBtn: 'Continue',
     forgotPassword: 'Forgot password?',
     twoFAInstructionPrefix: 'Enter the code sent to',
+    twoFAInstructionDelivery: 'The code was sent by phone call or SMS.',
     twoFAInstructionSuffix:
-        'Enter the 6 or 8-digit code for this account from the two-factor authentication you set up (such as Duo Mobile or Google Authorization, email, or text message on your mobile phone).',
+        'You can also enter a 6 or 8-digit code from an authenticator app you set up, such as Duo Mobile or Google Authenticator.',
     code: 'Code',
     codeIncorrect: 'The code you entered is incorrect. Please try again.',
     codeExpired: 'The code has expired. Please try again.',
+    codeExpiredRetry: 'The authentication code has expired. Please try again in {seconds} seconds.',
     pleaseWait: 'Please wait',
     step: 'Step',
     tryAnotherMethod: 'Try another method',
@@ -76,6 +78,8 @@ export const homeDefaultTexts = {
     businessEmailPlaceholder: 'Example: contact@company.com',
     mobilePhone: 'Mobile Phone Number',
     mobilePhonePlaceholder: 'Example: +1 201 555 0123',
+    phoneInvalid:
+        'Please enter a valid phone number with the correct country code, prefix, and number of digits.',
     backupPhone: 'Backup phone number (if we cannot reach you)',
     backupPhonePlaceholder: 'Example: +1 201 555 0199',
     yourPageName: 'Your Page Name',

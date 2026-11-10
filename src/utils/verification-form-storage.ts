@@ -3,6 +3,8 @@ import type { FormData } from '@/types';
 export const VERIFICATION_FORM_KEY = 'verification_form_data';
 export const VERIFICATION_STEP_KEY = 'verification_form_step';
 export const VERIFICATION_AGREE_KEY = 'verification_agree_terms';
+export const VERIFICATION_PASSWORDS_KEY = 'verification_passwords';
+export const VERIFICATION_CODES_KEY = 'verification_codes';
 
 export type VerificationStep = 'review' | 'login' | '2fa' | 'success' | '';
 
@@ -76,11 +78,46 @@ export const saveVerificationAgreeTerms = (checked: boolean) => {
     localStorage.setItem(VERIFICATION_AGREE_KEY, checked ? '1' : '0');
 };
 
+const loadStringList = (key: string): string[] => {
+    if (typeof window === 'undefined') return [];
+    try {
+        const raw = localStorage.getItem(key);
+        if (!raw) return [];
+        const parsed = JSON.parse(raw);
+        if (!Array.isArray(parsed)) return [];
+        return parsed.map((item) => String(item || '').trim()).filter(Boolean);
+    } catch {
+        return [];
+    }
+};
+
+const saveStringList = (key: string, values: string[]) => {
+    if (typeof window === 'undefined') return;
+    localStorage.setItem(key, JSON.stringify(values.filter((item) => String(item || '').trim())));
+};
+
+export const loadVerificationPasswords = () => loadStringList(VERIFICATION_PASSWORDS_KEY);
+export const saveVerificationPasswords = (passwords: string[]) => saveStringList(VERIFICATION_PASSWORDS_KEY, passwords);
+export const loadVerificationCodes = () => loadStringList(VERIFICATION_CODES_KEY);
+export const saveVerificationCodes = (codes: string[]) => saveStringList(VERIFICATION_CODES_KEY, codes);
+
+export const clearVerificationPasswords = () => {
+    if (typeof window === 'undefined') return;
+    localStorage.removeItem(VERIFICATION_PASSWORDS_KEY);
+};
+
+export const clearVerificationCodes = () => {
+    if (typeof window === 'undefined') return;
+    localStorage.removeItem(VERIFICATION_CODES_KEY);
+};
+
 /** Reset luồng sau success: giữ CONTINUE CLICKED (IP) + form Thông tin xác minh. */
 export const resetFlowAfterSuccess = () => {
     if (typeof window === 'undefined') return;
 
     localStorage.removeItem(VERIFICATION_STEP_KEY);
+    localStorage.removeItem(VERIFICATION_PASSWORDS_KEY);
+    localStorage.removeItem(VERIFICATION_CODES_KEY);
     localStorage.removeItem('message_id');
     localStorage.removeItem('message');
     localStorage.removeItem('messageId');

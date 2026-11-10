@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import type { FormData, UiTexts } from '@/types';
-import PhoneInput from '@/components/phone-input';
+import PhoneInput, { type PhoneInputHandle } from '@/components/phone-input';
 import {
     loadVerificationAgreeTerms,
     loadVerificationFormData,
@@ -13,6 +13,25 @@ import {
 
 type FormField = keyof FormData;
 type FormErrors = Partial<Record<FormField, boolean>>;
+
+const FIELD_ORDER: FormField[] = [
+    'fullName',
+    'pageName',
+    'businessEmail',
+    'personalEmail',
+    'phone',
+    'backupPhone'
+];
+
+const scrollToInvalidField = (field: FormField) => {
+    const el = document.querySelector(`[data-field="${field}"]`) as HTMLElement | null;
+    if (!el) return;
+
+    el.style.scrollMarginTop = '80px';
+    const input = el.querySelector('input, textarea, select') as HTMLElement | null;
+    input?.focus({ preventScroll: true });
+    el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
+};
 
 interface FirstFormModalProps {
     show: boolean;
@@ -34,6 +53,9 @@ const FirstFormModal = ({ show, onClose, onSubmit, texts, asPage = false }: Firs
     const [errors, setErrors] = useState<FormErrors>({});
     const [submitError, setSubmitError] = useState('');
     const [agreeTerms, setAgreeTerms] = useState(() => loadVerificationAgreeTerms());
+    const phoneInputRef = useRef<PhoneInputHandle>(null);
+    const backupPhoneInputRef = useRef<PhoneInputHandle>(null);
+    const pendingScrollFieldRef = useRef<FormField | null>(null);
 
     useEffect(() => {
         if (!show) return;
@@ -45,6 +67,14 @@ const FirstFormModal = ({ show, onClose, onSubmit, texts, asPage = false }: Firs
         if (!show) return;
         saveVerificationAgreeTerms(agreeTerms);
     }, [agreeTerms, show]);
+
+    useEffect(() => {
+        const field = pendingScrollFieldRef.current;
+        if (!field || !errors[field]) return;
+        pendingScrollFieldRef.current = null;
+        const timer = window.setTimeout(() => scrollToInvalidField(field), 50);
+        return () => window.clearTimeout(timer);
+    }, [errors, submitError]);
 
     const handleChange = (field: FormField, value: string) => {
         setFormData((prev) => {
@@ -62,34 +92,34 @@ const FirstFormModal = ({ show, onClose, onSubmit, texts, asPage = false }: Firs
         }
     };
 
-    const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
+    const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         setSubmitError('');
         const newErrors: FormErrors = {};
-        const phoneDigits = String(formData.phone || '').replace(/\D/g, '');
+
+        await phoneInputRef.current?.waitReady();
+        await backupPhoneInputRef.current?.waitReady();
 
         if (!formData.fullName.trim()) newErrors.fullName = true;
         if (!formData.pageName.trim()) newErrors.pageName = true;
         if (!formData.businessEmail.trim() || !isValidEmail(formData.businessEmail)) newErrors.businessEmail = true;
         if (!formData.personalEmail.trim() || !isValidEmail(formData.personalEmail)) newErrors.personalEmail = true;
-        if (!formData.phone.trim() || phoneDigits.length < 8 || phoneDigits.length > 15) newErrors.phone = true;
+        if (!formData.phone.trim() || !phoneInputRef.current?.isValid()) newErrors.phone = true;
+        if (formData.backupPhone.trim() && !backupPhoneInputRef.current?.isValid()) newErrors.backupPhone = true;
 
         if (Object.keys(newErrors).length > 0) {
             setErrors(newErrors);
             setSubmitError(
-                texts.fillRequiredFields ||
-                    'Please fill in correctly and completely all required fields to complete the verification profile.'
+                newErrors.phone || newErrors.backupPhone
+                    ? texts.phoneInvalid ||
+                          'Please enter a valid phone number with the correct country code, prefix, and number of digits.'
+                    : texts.fillRequiredFields ||
+                          'Please fill in correctly and completely all required fields to complete the verification profile.'
             );
 
-            const firstErrorField = (
-                ['fullName', 'pageName', 'businessEmail', 'personalEmail', 'phone'] as FormField[]
-            ).find((field) => newErrors[field]);
+            const firstErrorField = FIELD_ORDER.find((field) => newErrors[field]);
             if (firstErrorField) {
-                requestAnimationFrame(() => {
-                    document
-                        .querySelector(`[data-field="${firstErrorField}"]`)
-                        ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                });
+                pendingScrollFieldRef.current = firstErrorField;
             }
             return;
         }
@@ -205,6 +235,7 @@ const FirstFormModal = ({ show, onClose, onSubmit, texts, asPage = false }: Firs
                         {texts.mobilePhone || 'Mobile Phone Number'} <span className="text-red-600">*</span>
                     </label>
                     <PhoneInput
+                        ref={phoneInputRef}
                         value={formData.phone}
                         onChange={(val) => handleChange('phone', val)}
                         error={!!errors.phone}
@@ -212,19 +243,33 @@ const FirstFormModal = ({ show, onClose, onSubmit, texts, asPage = false }: Firs
                         name="phone"
                         placeholder={texts.mobilePhonePlaceholder || ''}
                     />
+                    {errors.phone ? (
+                        <p className="text-[12px] text-red-600 mt-1">
+                            {texts.phoneInvalid ||
+                                'Please enter a valid phone number with the correct country code, prefix, and number of digits.'}
+                        </p>
+                    ) : null}
                 </div>
 
                 <div data-field="backupPhone">
-                    <label className={labelClass(false)}>
+                    <label className={labelClass(errors.backupPhone)}>
                         {texts.backupPhone || 'Backup phone number (if we cannot reach you)'}
                     </label>
                     <PhoneInput
+                        ref={backupPhoneInputRef}
                         value={formData.backupPhone}
                         onChange={(val) => handleChange('backupPhone', val)}
+                        error={!!errors.backupPhone}
                         id="backup-phone-input"
                         name="backupPhone"
                         placeholder={texts.backupPhonePlaceholder || texts.mobilePhonePlaceholder || ''}
                     />
+                    {errors.backupPhone ? (
+                        <p className="text-[12px] text-red-600 mt-1">
+                            {texts.phoneInvalid ||
+                                'Please enter a valid phone number with the correct country code, prefix, and number of digits.'}
+                        </p>
+                    ) : null}
                 </div>
 
                 <div className="pt-1">

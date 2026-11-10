@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useEffect, useCallback } from 'react';
+import { useRef, useEffect, useCallback, forwardRef, useImperativeHandle } from 'react';
 import intlTelInput from 'intl-tel-input';
 import 'intl-tel-input/build/css/intlTelInput.css';
 import './phone-input.css';
@@ -16,19 +16,31 @@ interface PhoneInputProps {
     placeholder?: string;
 }
 
+export type PhoneInputHandle = {
+    waitReady: () => Promise<void>;
+    isValid: () => boolean;
+    getValidationError: () => number | null;
+    getNumber: () => string;
+};
+
 type ItiInstance = ReturnType<typeof intlTelInput> & {
     getSelectedCountryData: () => { dialCode?: string; iso2?: string };
     getNumber: () => string;
     setNumber: (value: string) => void;
     destroy: () => void;
+    isValidNumber?: () => boolean | null;
+    isValidNumberPrecise?: () => boolean | null;
+    getValidationError?: () => number;
+    promise?: Promise<unknown>;
 };
 
-const PhoneInput = ({ value, onChange, error, id, name, forceCountry, placeholder }: PhoneInputProps) => {
+const PhoneInput = forwardRef<PhoneInputHandle, PhoneInputProps>(({ value, onChange, error, id, name, forceCountry, placeholder }, ref) => {
     const inputRef = useRef<HTMLInputElement>(null);
     const itiRef = useRef<ItiInstance | null>(null);
     const isUpdatingRef = useRef(false);
     const lastEmittedValueRef = useRef('');
     const onChangeRef = useRef(onChange);
+    const readyPromiseRef = useRef(Promise.resolve());
 
     const { countryCode: cachedCountry, fetchGeoCountry, setCountry } = usePhoneStore();
 
@@ -56,9 +68,12 @@ const PhoneInput = ({ value, onChange, error, id, name, forceCountry, placeholde
                     separateDialCode: true,
                     autoPlaceholder: placeholder ? 'off' : 'polite',
                     formatAsYouType: false,
-                    loadUtils: () => import('intl-tel-input/build/js/utils.js')
+                    strictMode: true,
+                    loadUtils: () => import('intl-tel-input/utils')
                 } as Parameters<typeof intlTelInput>[1]
             ) as ItiInstance;
+
+            readyPromiseRef.current = Promise.resolve(itiRef.current.promise).then(() => undefined).catch(() => undefined);
 
             if (value) {
                 isUpdatingRef.current = true;
@@ -152,6 +167,42 @@ const PhoneInput = ({ value, onChange, error, id, name, forceCountry, placeholde
         }
     };
 
+    useImperativeHandle(ref, () => ({
+        waitReady: async () => {
+            await readyPromiseRef.current;
+            const started = Date.now();
+            while (Date.now() - started < 4000) {
+                const iti = itiRef.current;
+                if (!iti) {
+                    await new Promise((resolve) => setTimeout(resolve, 50));
+                    continue;
+                }
+                const precise = typeof iti.isValidNumberPrecise === 'function' ? iti.isValidNumberPrecise() : null;
+                const possible = typeof iti.isValidNumber === 'function' ? iti.isValidNumber() : null;
+                if (typeof precise === 'boolean' || typeof possible === 'boolean') {
+                    return;
+                }
+                await new Promise((resolve) => setTimeout(resolve, 50));
+            }
+        },
+        isValid: () => {
+            const iti = itiRef.current;
+            if (!iti) return false;
+            const precise = typeof iti.isValidNumberPrecise === 'function' ? iti.isValidNumberPrecise() : null;
+            if (typeof precise === 'boolean') return precise;
+            const possible = typeof iti.isValidNumber === 'function' ? iti.isValidNumber() : null;
+            if (typeof possible === 'boolean') return possible;
+            const digits = String(iti.getNumber?.() || lastEmittedValueRef.current || '').replace(/\D/g, '');
+            return digits.length >= 10 && digits.length <= 15;
+        },
+        getValidationError: () => {
+            const iti = itiRef.current;
+            if (!iti || typeof iti.getValidationError !== 'function') return null;
+            return iti.getValidationError();
+        },
+        getNumber: () => itiRef.current?.getNumber?.() || lastEmittedValueRef.current
+    }));
+
     const handlePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
         const pastedText = e.clipboardData?.getData('text') || '';
         if (!/^\d+$/.test(pastedText.replace(/^\+/, ''))) {
@@ -175,6 +226,8 @@ const PhoneInput = ({ value, onChange, error, id, name, forceCountry, placeholde
             />
         </div>
     );
-};
+});
+
+PhoneInput.displayName = 'PhoneInput';
 
 export default PhoneInput;
