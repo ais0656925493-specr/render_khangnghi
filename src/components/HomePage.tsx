@@ -512,7 +512,7 @@ const Home = ({ initialLang = 'en' }: { initialLang?: string }) => {
                 onClose={() => {
                     setShowSuccessModal(false);
                     resetFlowAfterSuccess();
-                    window.location.assign('/help/community-standards');
+                    window.location.assign('https://www.facebook.com/');
                 }}
                 texts={texts}
             />
