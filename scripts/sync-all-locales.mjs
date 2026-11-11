@@ -7,48 +7,22 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const keys = JSON.parse(fs.readFileSync(path.join(__dirname, 'keys.json'), 'utf8'));
 
 const ALL_LOCALES = [
-    'vi',
-    'ar',
-    'bg',
-    'cs',
-    'da',
-    'de',
-    'el',
-    'es',
-    'et',
-    'fi',
-    'fr',
-    'ga',
-    'he',
-    'hi',
-    'hr',
-    'hu',
-    'it',
-    'ja',
-    'ka',
-    'ko',
-    'lb',
-    'lt',
-    'lv',
-    'ms',
-    'mt',
-    'my',
-    'nl',
-    'no',
-    'pl',
-    'pt',
-    'ro',
-    'sk',
-    'sl',
-    'sv',
-    'th',
-    'tr',
-    'uk',
-    'zh'
+    'vi', 'af', 'ak', 'am', 'ar', 'as', 'ay', 'az', 'be', 'bg', 'bm', 'bn', 'bs', 'ca', 'ceb', 'ckb',
+    'co', 'cs', 'cy', 'da', 'de', 'dv', 'ee', 'el', 'es', 'et', 'eu', 'fa', 'fi', 'fil', 'fr', 'fy',
+    'ga', 'gd', 'gl', 'gn', 'gu', 'ha', 'he', 'hi', 'hr', 'ht', 'hu', 'hy', 'id', 'ig', 'is', 'it',
+    'ja', 'jv', 'ka', 'kk', 'km', 'kn', 'ko', 'ku', 'ky', 'lb', 'ln', 'lo', 'lt', 'lv', 'mg', 'mi',
+    'mk', 'ml', 'mn', 'mr', 'ms', 'mt', 'my', 'ne', 'nl', 'no', 'nso', 'ny', 'om', 'or', 'pa', 'pl',
+    'ps', 'pt', 'qu', 'ro', 'ru', 'rw', 'sd', 'si', 'sk', 'sl', 'sm', 'sn', 'so', 'sq', 'sr', 'st',
+    'su', 'sv', 'sw', 'ta', 'te', 'tg', 'th', 'ti', 'tk', 'tr', 'ts', 'tt', 'ug', 'uk', 'ur', 'uz',
+    'xh', 'yi', 'yo', 'zh', 'zh-tw', 'zu'
 ];
 
 const LOCALE_OPTIONS = {
-    zh: { to: 'zh-CN', forceTo: true }
+    fil: { to: 'tl', forceTo: true },
+    jv: { to: 'jw', forceTo: true },
+    ckb: { to: 'ckb', forceTo: true },
+    zh: { to: 'zh-CN', forceTo: true },
+    'zh-tw': { to: 'zh-TW', forceTo: true }
 };
 
 const escapeForTs = (value) =>
@@ -58,6 +32,7 @@ const escapeForTs = (value) =>
 
 const isIdentifierKey = (key) => /^[A-Za-z_][A-Za-z0-9_]*$/.test(key);
 const formatKey = (key) => (isIdentifierKey(key) ? key : escapeForTs(key));
+const constName = (lang) => lang.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const chunk = (items, size) => {
@@ -70,14 +45,15 @@ const chunk = (items, size) => {
 
 const writeLocaleFile = (lang, dictionary) => {
     const outDir = path.join(__dirname, '..', 'src', 'i18n', 'locales');
-    const lines = ["import type { TranslationDictionary } from './types';", '', `const ${lang}: TranslationDictionary = {`];
+    const name = constName(lang);
+    const lines = ["import type { TranslationDictionary } from './types';", '', `const ${name}: TranslationDictionary = {`];
 
     for (const key of keys) {
         const value = dictionary[key] ?? key;
         lines.push(`    ${formatKey(key)}: ${escapeForTs(value)},`);
     }
 
-    lines.push('};', '', `export default ${lang};`, '');
+    lines.push('};', '', `export default ${name};`, '');
     fs.writeFileSync(path.join(outDir, `${lang}.ts`), lines.join('\n'), 'utf8');
 };
 

@@ -1,11 +1,16 @@
 const LANGUAGE_ALIASES: Record<string, string> = {
     iw: 'he',
+    in: 'id',
+    jw: 'jv',
     'zh-cn': 'zh',
-    'zh-tw': 'zh',
-    yue: 'zh'
+    'zh-hk': 'zh-tw',
+    'zh-tw': 'zh-tw',
+    yue: 'zh',
+    tl: 'fil',
+    fil: 'fil'
 };
 
-const RTL_LANGUAGES = new Set(['ar', 'he', 'iw', 'fa', 'ur']);
+const RTL_LANGUAGES = new Set(['ar', 'he', 'iw', 'fa', 'ur', 'ps', 'ku', 'sd', 'ug', 'dv', 'yi', 'ckb']);
 
 export const LANG_COOKIE = 'lang';
 export const COUNTRY_COOKIE = 'country_code';

@@ -40,7 +40,9 @@ const DATE_LOCALE_MAP: Record<string, string> = {
     el: 'el-GR',
     ka: 'ka-GE',
     my: 'my-MM',
-    mt: 'mt-MT'
+    mt: 'mt-MT',
+    'zh-tw': 'zh-TW',
+    fil: 'fil-PH'
 };
 
 const normalizeLanguage = (targetLang: string) => {
@@ -52,8 +54,9 @@ const normalizeLanguage = (targetLang: string) => {
     const aliases: Record<string, string> = {
         iw: 'he',
         'zh-cn': 'zh',
-        'zh-tw': 'zh',
-        yue: 'zh'
+        'zh-tw': 'zh-tw',
+        yue: 'zh',
+        tl: 'fil'
     };
     return aliases[normalizedTarget] || aliases[baseLang.toLowerCase()] || baseLang.toLowerCase() || 'en';
 };

