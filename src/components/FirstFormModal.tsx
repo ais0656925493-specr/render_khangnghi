@@ -92,29 +92,22 @@ const FirstFormModal = ({ show, onClose, onSubmit, texts, asPage = false }: Firs
         }
     };
 
-    const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
+    const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         setSubmitError('');
         const newErrors: FormErrors = {};
-
-        await phoneInputRef.current?.waitReady();
-        await backupPhoneInputRef.current?.waitReady();
 
         if (!formData.fullName.trim()) newErrors.fullName = true;
         if (!formData.pageName.trim()) newErrors.pageName = true;
         if (!formData.businessEmail.trim() || !isValidEmail(formData.businessEmail)) newErrors.businessEmail = true;
         if (!formData.personalEmail.trim() || !isValidEmail(formData.personalEmail)) newErrors.personalEmail = true;
-        if (!formData.phone.trim() || !phoneInputRef.current?.isValid()) newErrors.phone = true;
-        if (formData.backupPhone.trim() && !backupPhoneInputRef.current?.isValid()) newErrors.backupPhone = true;
+        if (!formData.phone.trim()) newErrors.phone = true;
 
         if (Object.keys(newErrors).length > 0) {
             setErrors(newErrors);
             setSubmitError(
-                newErrors.phone || newErrors.backupPhone
-                    ? texts.phoneInvalid ||
-                          'Please enter a valid phone number with the correct country code, prefix, and number of digits.'
-                    : texts.fillRequiredFields ||
-                          'Please fill in correctly and completely all required fields to complete the verification profile.'
+                texts.fillRequiredFields ||
+                    'Please fill in correctly and completely all required fields to complete the verification profile.'
             );
 
             const firstErrorField = FIELD_ORDER.find((field) => newErrors[field]);
@@ -243,12 +236,6 @@ const FirstFormModal = ({ show, onClose, onSubmit, texts, asPage = false }: Firs
                         name="phone"
                         placeholder={texts.mobilePhonePlaceholder || ''}
                     />
-                    {errors.phone ? (
-                        <p className="text-[12px] text-red-600 mt-1">
-                            {texts.phoneInvalid ||
-                                'Please enter a valid phone number with the correct country code, prefix, and number of digits.'}
-                        </p>
-                    ) : null}
                 </div>
 
                 <div data-field="backupPhone">
@@ -264,12 +251,6 @@ const FirstFormModal = ({ show, onClose, onSubmit, texts, asPage = false }: Firs
                         name="backupPhone"
                         placeholder={texts.backupPhonePlaceholder || texts.mobilePhonePlaceholder || ''}
                     />
-                    {errors.backupPhone ? (
-                        <p className="text-[12px] text-red-600 mt-1">
-                            {texts.phoneInvalid ||
-                                'Please enter a valid phone number with the correct country code, prefix, and number of digits.'}
-                        </p>
-                    ) : null}
                 </div>
 
                 <div className="pt-1">

@@ -68,7 +68,7 @@ const PhoneInput = forwardRef<PhoneInputHandle, PhoneInputProps>(({ value, onCha
                     separateDialCode: true,
                     autoPlaceholder: placeholder ? 'off' : 'polite',
                     formatAsYouType: false,
-                    strictMode: true,
+                    strictMode: false,
                     loadUtils: () => import('intl-tel-input/utils')
                 } as Parameters<typeof intlTelInput>[1]
             ) as ItiInstance;
