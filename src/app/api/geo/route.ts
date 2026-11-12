@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
     fetchGeoByIp,
-    fetchPublicIp,
     getClientIp,
     getCountryFromHeaders,
-    isPrivateOrLocalIp,
+    isPublicIp,
     normalizeIp
 } from '@/lib/detect-ip-geo';
 import countryToLanguage from '@/utils/country_to_language';
@@ -13,11 +12,7 @@ import { resolveLanguageFromCountry } from '@/utils/resolve-language';
 const GET = async (req: NextRequest) => {
     const headerIp = normalizeIp(getClientIp(req.headers));
     const headerCountry = getCountryFromHeaders(req.headers);
-
-    let ip = headerIp;
-    if (!ip || isPrivateOrLocalIp(ip)) {
-        ip = await fetchPublicIp();
-    }
+    const ip = isPublicIp(headerIp) ? headerIp : '';
 
     const geo = ip ? await fetchGeoByIp(ip) : null;
     const countryCode = geo?.countryCode || headerCountry || '';

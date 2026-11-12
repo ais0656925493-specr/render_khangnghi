@@ -59,8 +59,8 @@ const LandingPage = ({ onContinue, initialLang = 'en' }: LandingPageProps) => {
             setIpInfo(geo.ipInfo);
             if (manual) {
                 applyLang(preferredLang);
-            } else if (geo.lang && geo.lang !== preferredLang) {
-                applyLang(geo.lang);
+            } else {
+                applyLang(geo.lang || preferredLang);
             }
 
             const botResult = await detectBot();

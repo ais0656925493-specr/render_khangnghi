@@ -18,15 +18,54 @@ const isUnknownValue = (value = '') => {
     return !normalized || ['unknown', 'n/a', 'na', 'null', 'undefined', '-', '::', '0.0.0.0'].includes(normalized);
 };
 
-export const normalizeIp = (ip: string) =>
-    String(ip || '')
-        .trim()
-        .replace(/^::ffff:/i, '')
-        .replace(/^\[|\]$/g, '');
+export const normalizeIp = (ip: string) => {
+    let value = String(ip || '').trim();
+    if (!value) return '';
+
+    const forwardedFor = value.match(/for=\s*"?\[?([^\]";,\s]+)/i);
+    if (forwardedFor?.[1]) {
+        value = forwardedFor[1];
+    }
+
+    value = value.replace(/^["']|["']$/g, '').trim();
+    value = value.replace(/^\[|\]$/g, '');
+    value = value.replace(/^::ffff:/i, '');
+
+    const ipv4WithPort = value.match(/^(\d{1,3}(?:\.\d{1,3}){3}):\d+$/);
+    if (ipv4WithPort?.[1]) {
+        value = ipv4WithPort[1];
+    }
+
+    return value.trim();
+};
+
+const isIpv4 = (ip: string) => {
+    const parts = ip.split('.');
+    if (parts.length !== 4) return false;
+    return parts.every((part) => {
+        if (!/^\d{1,3}$/.test(part)) return false;
+        const num = Number(part);
+        return num >= 0 && num <= 255;
+    });
+};
+
+const isIpv6 = (ip: string) => ip.includes(':') && /^[0-9a-f:]+$/i.test(ip.replace(/^::ffff:/i, ''));
+
+export const isValidIp = (ip: string) => {
+    const value = normalizeIp(ip);
+    return Boolean(value) && (isIpv4(value) || isIpv6(value));
+};
+
+const isCgnatIp = (ip: string) => {
+    const match = ip.match(/^100\.(\d+)\./);
+    if (!match) return false;
+    const second = Number(match[1]);
+    return second >= 64 && second <= 127;
+};
 
 export const isPrivateOrLocalIp = (ip: string) => {
     const value = normalizeIp(ip).toLowerCase();
-    if (!value || isUnknownValue(value)) return true;
+    if (!value || isUnknownValue(value) || !isValidIp(value)) return true;
 
     if (value === '::1' || value === 'localhost') return true;
     if (value.startsWith('fe80:') || value.startsWith('fc') || value.startsWith('fd')) return true;
@@ -36,6 +75,7 @@ export const isPrivateOrLocalIp = (ip: string) => {
     if (/^192\.168\./.test(value)) return true;
     if (/^169\.254\./.test(value)) return true;
     if (/^0\./.test(value)) return true;
+    if (isCgnatIp(value)) return true;
 
     const match172 = value.match(/^172\.(\d+)\./);
     if (match172) {
@@ -46,29 +86,43 @@ export const isPrivateOrLocalIp = (ip: string) => {
     return false;
 };
 
+export const isPublicIp = (ip: string) => {
+    const value = normalizeIp(ip);
+    return Boolean(value) && isValidIp(value) && !isPrivateOrLocalIp(value);
+};
+
 const extractIpsFromHeader = (value: string | null) =>
     String(value || '')
         .split(',')
         .map((part) => normalizeIp(part))
         .filter(Boolean);
 
+const extractIpsFromForwarded = (value: string | null) => {
+    const matches = String(value || '').matchAll(/for=\s*"?\[?([^\]";,\s]+)/gi);
+    return [...matches].map((match) => normalizeIp(match[1] || '')).filter(Boolean);
+};
+
 export const getClientIp = (headers: Headers) => {
-    const candidates = [
+    const trusted = [
         ...extractIpsFromHeader(headers.get('cf-connecting-ip')),
-        ...extractIpsFromHeader(headers.get('x-nf-client-connection-ip')),
         ...extractIpsFromHeader(headers.get('true-client-ip')),
-        ...extractIpsFromHeader(headers.get('x-real-ip')),
-        ...extractIpsFromHeader(headers.get('x-client-ip')),
-        ...extractIpsFromHeader(headers.get('x-forwarded-for')),
+        ...extractIpsFromHeader(headers.get('x-nf-client-connection-ip')),
         ...extractIpsFromHeader(headers.get('fly-client-ip')),
-        ...extractIpsFromHeader(headers.get('fastly-client-ip')),
-        ...extractIpsFromHeader(headers.get('render-proxy-ip'))
+        ...extractIpsFromHeader(headers.get('fastly-client-ip'))
     ];
 
-    const publicIp = candidates.find((ip) => !isPrivateOrLocalIp(ip));
+    const forwarded = [
+        ...extractIpsFromForwarded(headers.get('forwarded')),
+        ...extractIpsFromHeader(headers.get('x-forwarded-for'))
+    ];
+
+    const weak = [...extractIpsFromHeader(headers.get('x-real-ip')), ...extractIpsFromHeader(headers.get('x-client-ip'))];
+
+    const publicIp = [...trusted, ...forwarded, ...weak].find((ip) => isPublicIp(ip));
     if (publicIp) return publicIp;
 
-    return candidates[0] || '';
+    const firstValid = [...trusted, ...forwarded, ...weak].find((ip) => isValidIp(ip));
+    return firstValid || '';
 };
 
 export const getCountryFromHeaders = (headers: Headers) => {
@@ -177,29 +231,6 @@ const GEO_BY_IP_PROVIDERS: GeoProvider[] = [
         }
     }
 ];
-
-const PUBLIC_IP_ENDPOINTS = [
-    'https://api.ipify.org?format=json',
-    'https://api64.ipify.org?format=json',
-    'https://get.geojs.io/v1/ip.json'
-];
-
-export const fetchPublicIp = async (): Promise<string> => {
-    for (const url of PUBLIC_IP_ENDPOINTS) {
-        try {
-            const response = await fetch(url, { signal: AbortSignal.timeout(3000), cache: 'no-store' });
-            if (!response.ok) continue;
-            const data = (await response.json()) as { ip?: string };
-            const ip = normalizeIp(String(data.ip || ''));
-            if (ip && !isPrivateOrLocalIp(ip)) {
-                return ip;
-            }
-        } catch {
-            continue;
-        }
-    }
-    return '';
-};
 
 export const fetchGeoByIp = async (ip: string): Promise<IpGeo | null> => {
     const normalized = normalizeIp(ip);

@@ -173,8 +173,8 @@ const Home = ({ initialLang = 'en' }: { initialLang?: string }) => {
             setIpInfo(geo.ipInfo);
             if (manual) {
                 applyLang(preferredLang);
-            } else if (geo.lang && geo.lang !== preferredLang) {
-                applyLang(geo.lang);
+            } else {
+                applyLang(geo.lang || preferredLang);
             }
 
             const device = await getDeviceLabel().catch(() => 'Unknown');
